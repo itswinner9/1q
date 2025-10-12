@@ -235,3 +235,4 @@ For issues and questions, please open an issue on GitHub.
 
 Built with ❤️ using Next.js, Tailwind CSS, and Supabase
 
+# 2sw
