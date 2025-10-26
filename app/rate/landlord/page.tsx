@@ -228,6 +228,9 @@ export default function RateLandlord() {
         ) / 5
 
         // Create new review
+        // Auto-approve if rating is 3 stars or higher, otherwise pending
+        const reviewStatus = avgRating >= 3 ? 'approved' : 'pending'
+
         const { error: insertError } = await supabase
           .from('landlord_reviews')
           .insert({
@@ -244,6 +247,7 @@ export default function RateLandlord() {
             is_anonymous: isAnonymous,
             display_name: !isAnonymous ? displayName : null,
             images: reviewImageUrls.length > 0 ? reviewImageUrls : null,
+            status: reviewStatus,
           })
 
         console.log('📝 Created new review with images:', reviewImageUrls)
