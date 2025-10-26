@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Home, Star, Compass, User, LogOut, MapPin, Building2, Menu, X, PlusCircle, Shield } from 'lucide-react'
+import { Home, Star, Compass, User, LogOut, MapPin, Building2, Menu, X, PlusCircle, Shield, UserCheck, Building } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 
@@ -23,12 +23,12 @@ export default function Navigation() {
       if (session?.user) {
         const { data: profile, error } = await supabase
           .from('user_profiles')
-          .select('is_admin')
+          .select('role')
           .eq('id', session.user.id)
           .maybeSingle()
         
         console.log('Nav admin check:', { profile, error, email: session.user.email })
-        setIsAdmin(profile?.is_admin || false)
+        setIsAdmin(profile?.role === 'admin')
       }
     })
 
@@ -40,12 +40,12 @@ export default function Navigation() {
       if (session?.user) {
         const { data: profile, error } = await supabase
           .from('user_profiles')
-          .select('is_admin')
+          .select('role')
           .eq('id', session.user.id)
           .maybeSingle()
         
         console.log('Nav auth change admin check:', { profile, error })
-        setIsAdmin(profile?.is_admin || false)
+        setIsAdmin(profile?.role === 'admin')
       } else {
         setIsAdmin(false)
       }
@@ -76,9 +76,9 @@ export default function Navigation() {
             </div>
             <div className="flex flex-col">
               <span className="text-lg font-bold text-gray-900">
-                Neighborhood<span className="text-primary-500">Rank</span>
+                Liv<span className="text-primary-500">Rank</span>
               </span>
-              <span className="text-xs text-gray-500 hidden lg:block">Find Your Perfect Place</span>
+              <span className="text-xs text-gray-500 hidden lg:block">Real Reviews, Real Tenants</span>
             </div>
           </Link>
 
@@ -141,6 +141,28 @@ export default function Navigation() {
                         <div>
                           <p className="font-semibold text-gray-900">Rate a Building</p>
                           <p className="text-xs text-gray-500">Review your apartment</p>
+                        </div>
+                      </Link>
+                      <Link
+                        href="/rate/landlord"
+                        className="flex items-center space-x-3 px-4 py-3 hover:bg-primary-50 transition-colors"
+                        onClick={() => setShowRateDropdown(false)}
+                      >
+                        <UserCheck className="w-5 h-5 text-primary-600" />
+                        <div>
+                          <p className="font-semibold text-gray-900">Rate a Landlord</p>
+                          <p className="text-xs text-gray-500">Review your landlord</p>
+                        </div>
+                      </Link>
+                      <Link
+                        href="/rate/rent-company"
+                        className="flex items-center space-x-3 px-4 py-3 hover:bg-primary-50 transition-colors"
+                        onClick={() => setShowRateDropdown(false)}
+                      >
+                        <Building className="w-5 h-5 text-primary-600" />
+                        <div>
+                          <p className="font-semibold text-gray-900">Rate a Rent Company</p>
+                          <p className="text-xs text-gray-500">Review rent companies</p>
                         </div>
                       </Link>
                     </div>
@@ -283,11 +305,27 @@ export default function Navigation() {
                   </Link>
                   <Link
                     href="/rate/building"
-                    className="flex items-center space-x-2 px-4 py-3 bg-primary-50 rounded-lg text-primary-600"
+                    className="flex items-center space-x-2 px-4 py-3 bg-primary-50 rounded-lg text-primary-600 mb-2"
                     onClick={() => setShowMobileMenu(false)}
                   >
                     <Building2 className="w-5 h-5" />
                     <span>Rate a Building</span>
+                  </Link>
+                  <Link
+                    href="/rate/landlord"
+                    className="flex items-center space-x-2 px-4 py-3 bg-primary-50 rounded-lg text-primary-600 mb-2"
+                    onClick={() => setShowMobileMenu(false)}
+                  >
+                    <UserCheck className="w-5 h-5" />
+                    <span>Rate a Landlord</span>
+                  </Link>
+                  <Link
+                    href="/rate/rent-company"
+                    className="flex items-center space-x-2 px-4 py-3 bg-primary-50 rounded-lg text-primary-600"
+                    onClick={() => setShowMobileMenu(false)}
+                  >
+                    <Building className="w-5 h-5" />
+                    <span>Rate a Rent Company</span>
                   </Link>
                 </div>
 

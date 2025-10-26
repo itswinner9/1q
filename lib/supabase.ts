@@ -109,6 +109,9 @@ export interface NeighborhoodReview {
   images: string[]
   is_anonymous?: boolean
   display_name?: string
+  status?: string
+  helpful_count?: number
+  not_helpful_count?: number
   created_at: string
   updated_at: string
   user?: User
@@ -128,6 +131,9 @@ export interface BuildingReview {
   images: string[]
   is_anonymous?: boolean
   display_name?: string
+  status?: string
+  helpful_count?: number
+  not_helpful_count?: number
   created_at: string
   updated_at: string
   user?: User

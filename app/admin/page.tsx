@@ -51,28 +51,45 @@ export default function AdminDashboard() {
   }
 
   const fetchStats = async () => {
+    console.log('🔍 Fetching admin stats...')
+    
     // Fetch users
-    const { data: users } = await supabase
+    const { data: users, error: usersError } = await supabase
       .from('user_profiles')
       .select('id')
+    
+    if (usersError) console.error('❌ Users fetch error:', usersError)
+    else console.log('✅ Users fetched:', users?.length || 0)
 
     // Fetch all reviews
-    const { data: nReviews } = await supabase
+    const { data: nReviews, error: nReviewsError } = await supabase
       .from('neighborhood_reviews')
       .select('id, status, safety, cleanliness, noise, community, transit, amenities')
     
-    const { data: bReviews } = await supabase
+    if (nReviewsError) console.error('❌ Neighborhood reviews fetch error:', nReviewsError)
+    else console.log('✅ Neighborhood reviews fetched:', nReviews?.length || 0)
+    
+    const { data: bReviews, error: bReviewsError } = await supabase
       .from('building_reviews')
       .select('id, status, management, cleanliness, maintenance, rent_value, noise, amenities')
+    
+    if (bReviewsError) console.error('❌ Building reviews fetch error:', bReviewsError)
+    else console.log('✅ Building reviews fetched:', bReviews?.length || 0)
 
     // Fetch locations
-    const { data: neighborhoods } = await supabase
+    const { data: neighborhoods, error: neighborhoodsError } = await supabase
       .from('neighborhoods')
       .select('id')
+    
+    if (neighborhoodsError) console.error('❌ Neighborhoods fetch error:', neighborhoodsError)
+    else console.log('✅ Neighborhoods fetched:', neighborhoods?.length || 0)
 
-    const { data: buildings } = await supabase
+    const { data: buildings, error: buildingsError } = await supabase
       .from('buildings')
       .select('id')
+    
+    if (buildingsError) console.error('❌ Buildings fetch error:', buildingsError)
+    else console.log('✅ Buildings fetched:', buildings?.length || 0)
 
     const allReviews = [...(nReviews || []), ...(bReviews || [])]
     const pending = allReviews.filter(r => r.status === 'pending').length

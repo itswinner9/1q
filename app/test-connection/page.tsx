@@ -1,164 +1,254 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { CheckCircle, XCircle, AlertTriangle } from 'lucide-react'
+import { CheckCircle, XCircle, Database, Users, Building2, MapPin } from 'lucide-react'
 
 export default function TestConnection() {
-  const [results, setResults] = useState<any>({})
-  const [testing, setTesting] = useState(true)
+  const [results, setResults] = useState<any>({
+    connection: { status: 'testing', message: 'Testing...' },
+    auth: { status: 'testing', message: 'Testing...' },
+    tables: { status: 'testing', message: 'Testing...', details: {} },
+    user: null,
+  })
 
   useEffect(() => {
     runTests()
   }, [])
 
   const runTests = async () => {
-    const tests: any = {}
-
-    // Test 1: Environment variables
-    tests.envUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ? '✅ Set' : '❌ Missing'
-    tests.envKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? '✅ Set' : '❌ Missing'
-    tests.urlValue = process.env.NEXT_PUBLIC_SUPABASE_URL || 'Not set'
-
-    // Test 2: Supabase client created
-    tests.clientCreated = supabase ? '✅ Yes' : '❌ No'
-
-    // Test 3: Can connect to Supabase
-    try {
-      const start = Date.now()
-      const { data, error } = await supabase.auth.getSession()
-      const elapsed = Date.now() - start
-      
-      tests.connectionTime = `${elapsed}ms`
-      tests.connectionStatus = error ? `❌ Error: ${error.message}` : '✅ Success'
-      tests.hasSession = data.session ? '✅ Yes (logged in)' : 'No (not logged in)'
-    } catch (err: any) {
-      tests.connectionStatus = `❌ Exception: ${err.message}`
+    const newResults: any = {
+      connection: { status: 'testing', message: 'Testing...' },
+      auth: { status: 'testing', message: 'Testing...' },
+      tables: { status: 'testing', message: 'Testing...', details: {} },
+      user: null,
     }
 
-    // Test 4: Can query user_profiles table
+    // Test 1: Database Connection
     try {
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('count')
-        .limit(1)
+      const { data, error } = await supabase.from('neighborhoods').select('count')
       
-      tests.userProfilesTable = error 
-        ? `❌ Error: ${error.message}` 
-        : '✅ Table exists'
-    } catch (err: any) {
-      tests.userProfilesTable = `❌ Exception: ${err.message}`
+      if (error) {
+        newResults.connection = {
+          status: 'error',
+          message: `Connection failed: ${error.message}`,
+        }
+      } else {
+        newResults.connection = {
+          status: 'success',
+          message: 'Database connected successfully!',
+        }
+      }
+    } catch (error: any) {
+      newResults.connection = {
+        status: 'error',
+        message: `Connection error: ${error.message}`,
+      }
     }
 
-    // Test 5: Can query neighborhoods table
+    // Test 2: Check Current User
     try {
-      const { data, error } = await supabase
-        .from('neighborhoods')
-        .select('count')
-        .limit(1)
+      const { data: { session } } = await supabase.auth.getSession()
       
-      tests.neighborhoodsTable = error 
-        ? `❌ Error: ${error.message}` 
-        : '✅ Table exists'
-    } catch (err: any) {
-      tests.neighborhoodsTable = `❌ Exception: ${err.message}`
+      if (session?.user) {
+        newResults.auth = {
+          status: 'success',
+          message: `Logged in as: ${session.user.email}`,
+        }
+        newResults.user = session.user
+      } else {
+        newResults.auth = {
+          status: 'warning',
+          message: 'No user logged in (this is okay for testing)',
+        }
+      }
+    } catch (error: any) {
+      newResults.auth = {
+        status: 'error',
+        message: `Auth error: ${error.message}`,
+      }
     }
 
-    setResults(tests)
-    setTesting(false)
+    // Test 3: Check Tables Exist
+    const tablesToCheck = [
+      'user_profiles',
+      'neighborhoods',
+      'buildings',
+      'neighborhood_reviews',
+      'building_reviews',
+      'review_votes',
+    ]
+
+    const tableResults: any = {}
+    for (const table of tablesToCheck) {
+      try {
+        const { data, error } = await supabase.from(table).select('count').limit(1)
+        
+        if (error) {
+          tableResults[table] = { exists: false, error: error.message }
+        } else {
+          // Get actual count
+          const { count } = await supabase.from(table).select('*', { count: 'exact', head: true })
+          tableResults[table] = { exists: true, count: count || 0 }
+        }
+      } catch (error: any) {
+        tableResults[table] = { exists: false, error: error.message }
+      }
+    }
+
+    const allTablesExist = Object.values(tableResults).every((r: any) => r.exists)
+    
+    newResults.tables = {
+      status: allTablesExist ? 'success' : 'error',
+      message: allTablesExist 
+        ? 'All required tables exist!' 
+        : 'Some tables are missing - run LIVRANK_COMPLETE_DB.sql',
+      details: tableResults,
+    }
+
+    setResults(newResults)
   }
 
-  if (testing) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-gray-200 border-t-primary-500 mb-4"></div>
-          <p className="text-gray-600">Testing Supabase connection...</p>
-        </div>
-      </div>
-    )
+  const StatusIcon = ({ status }: { status: string }) => {
+    if (status === 'success') return <CheckCircle className="w-6 h-6 text-green-500" />
+    if (status === 'error') return <XCircle className="w-6 h-6 text-red-500" />
+    if (status === 'warning') return <CheckCircle className="w-6 h-6 text-yellow-500" />
+    return <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4">
-      <div className="max-w-3xl mx-auto">
-        <div className="bg-white rounded-3xl shadow-xl p-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-8">🔧 Supabase Connection Test</h1>
+    <main className="min-h-screen bg-gray-50 py-12 px-4">
+      <div className="max-w-4xl mx-auto">
+        <div className="bg-white rounded-3xl shadow-lg p-8">
+          <div className="flex items-center space-x-3 mb-8">
+            <Database className="w-10 h-10 text-primary-600" />
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">LivRank System Test</h1>
+              <p className="text-gray-600">Database & Authentication Verification</p>
+            </div>
+          </div>
 
-          <div className="space-y-4">
-            {/* Environment Variables */}
-            <div className="p-4 bg-gray-50 rounded-xl">
-              <h2 className="font-bold text-lg mb-3">1. Environment Variables</h2>
-              <div className="space-y-2 text-sm">
-                <p><strong>SUPABASE_URL:</strong> {results.envUrl}</p>
-                <p className="text-xs text-gray-600">{results.urlValue}</p>
-                <p><strong>SUPABASE_ANON_KEY:</strong> {results.envKey}</p>
+          <div className="space-y-6">
+            {/* Test 1: Connection */}
+            <div className="border border-gray-200 rounded-xl p-6">
+              <div className="flex items-start space-x-4">
+                <StatusIcon status={results.connection.status} />
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold text-gray-900 mb-1">Database Connection</h3>
+                  <p className={`text-sm ${
+                    results.connection.status === 'success' ? 'text-green-600' :
+                    results.connection.status === 'error' ? 'text-red-600' : 'text-gray-600'
+                  }`}>
+                    {results.connection.message}
+                  </p>
+                </div>
               </div>
             </div>
 
-            {/* Supabase Client */}
-            <div className="p-4 bg-gray-50 rounded-xl">
-              <h2 className="font-bold text-lg mb-3">2. Supabase Client</h2>
-              <div className="space-y-2 text-sm">
-                <p><strong>Client Created:</strong> {results.clientCreated}</p>
+            {/* Test 2: Auth */}
+            <div className="border border-gray-200 rounded-xl p-6">
+              <div className="flex items-start space-x-4">
+                <StatusIcon status={results.auth.status} />
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold text-gray-900 mb-1">Authentication Status</h3>
+                  <p className={`text-sm ${
+                    results.auth.status === 'success' ? 'text-green-600' :
+                    results.auth.status === 'warning' ? 'text-yellow-600' : 'text-red-600'
+                  }`}>
+                    {results.auth.message}
+                  </p>
+                  {results.user && (
+                    <div className="mt-3 p-3 bg-gray-50 rounded-lg text-xs">
+                      <p><strong>User ID:</strong> {results.user.id}</p>
+                      <p><strong>Email:</strong> {results.user.email}</p>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
-            {/* Connection Test */}
-            <div className="p-4 bg-gray-50 rounded-xl">
-              <h2 className="font-bold text-lg mb-3">3. Connection Test</h2>
-              <div className="space-y-2 text-sm">
-                <p><strong>Status:</strong> {results.connectionStatus}</p>
-                <p><strong>Response Time:</strong> {results.connectionTime}</p>
-                <p><strong>Has Session:</strong> {results.hasSession}</p>
-              </div>
-            </div>
-
-            {/* Database Tables */}
-            <div className="p-4 bg-gray-50 rounded-xl">
-              <h2 className="font-bold text-lg mb-3">4. Database Tables</h2>
-              <div className="space-y-2 text-sm">
-                <p><strong>user_profiles:</strong> {results.userProfilesTable}</p>
-                <p><strong>neighborhoods:</strong> {results.neighborhoodsTable}</p>
-              </div>
-            </div>
-
-            {/* Recommendations */}
-            <div className="p-6 bg-blue-50 rounded-xl border-2 border-blue-200">
-              <h2 className="font-bold text-lg mb-3 text-blue-900">💡 Recommendations:</h2>
-              <div className="space-y-2 text-sm text-blue-800">
-                {results.envUrl === '❌ Missing' && (
-                  <p>❌ Create .env.local file with Supabase credentials</p>
-                )}
-                {results.envKey === '❌ Missing' && (
-                  <p>❌ Add NEXT_PUBLIC_SUPABASE_ANON_KEY to .env.local</p>
-                )}
-                {results.connectionStatus?.includes('❌') && (
-                  <p>❌ Restart your dev server to load .env.local</p>
-                )}
-                {results.userProfilesTable?.includes('❌') && (
-                  <p>❌ Run FIX_EVERYTHING_NOW.sql in Supabase to create tables</p>
-                )}
-                {!results.connectionStatus?.includes('❌') && 
-                 !results.userProfilesTable?.includes('❌') && (
-                  <p>✅ Everything looks good! Login should work.</p>
-                )}
+            {/* Test 3: Tables */}
+            <div className="border border-gray-200 rounded-xl p-6">
+              <div className="flex items-start space-x-4">
+                <StatusIcon status={results.tables.status} />
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold text-gray-900 mb-3">Database Tables</h3>
+                  <p className={`text-sm mb-4 ${
+                    results.tables.status === 'success' ? 'text-green-600' : 'text-red-600'
+                  }`}>
+                    {results.tables.message}
+                  </p>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    {Object.entries(results.tables.details).map(([table, info]: [string, any]) => (
+                      <div key={table} className={`p-3 rounded-lg border ${
+                        info.exists ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
+                      }`}>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-semibold text-gray-900">{table}</span>
+                          {info.exists ? (
+                            <CheckCircle className="w-4 h-4 text-green-600" />
+                          ) : (
+                            <XCircle className="w-4 h-4 text-red-600" />
+                          )}
+                        </div>
+                        {info.exists && (
+                          <p className="text-xs text-gray-600 mt-1">{info.count} rows</p>
+                        )}
+                        {!info.exists && info.error && (
+                          <p className="text-xs text-red-600 mt-1">{info.error}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Actions */}
-          <div className="mt-6 flex gap-4">
-            <button onClick={runTests} className="btn-primary">
-              Run Tests Again
-            </button>
-            <a href="/" className="btn-secondary">
-              Go Home
+          {/* Action Buttons */}
+          <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <a
+              href="/signup"
+              className="flex items-center justify-center space-x-2 px-6 py-3 bg-primary-600 text-white rounded-xl font-semibold hover:bg-primary-700 transition-colors"
+            >
+              <Users className="w-5 h-5" />
+              <span>Test Signup</span>
+            </a>
+            
+            <a
+              href="/rate/building"
+              className="flex items-center justify-center space-x-2 px-6 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors"
+            >
+              <Building2 className="w-5 h-5" />
+              <span>Rate Building</span>
+            </a>
+            
+            <a
+              href="/rate/neighborhood"
+              className="flex items-center justify-center space-x-2 px-6 py-3 bg-green-600 text-white rounded-xl font-semibold hover:bg-green-700 transition-colors"
+            >
+              <MapPin className="w-5 h-5" />
+              <span>Rate Neighborhood</span>
+            </a>
+          </div>
+
+          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+            <p className="text-sm text-gray-700">
+              <strong>💡 Tip:</strong> If tables are missing, go to your Supabase dashboard 
+              and run the <code className="px-2 py-1 bg-white rounded">LIVRANK_COMPLETE_DB.sql</code> file.
+            </p>
+            <a 
+              href="https://supabase.com/dashboard/project/eehtzdpzbjsuendgwnwy/sql"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-primary-600 hover:text-primary-700 font-semibold underline mt-2 inline-block"
+            >
+              Open Supabase SQL Editor →
             </a>
           </div>
         </div>
       </div>
-    </div>
+    </main>
   )
 }
-

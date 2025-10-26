@@ -9,9 +9,10 @@ import { getNeighborhoodImage, getBuildingImage } from '@/lib/defaultImages'
 interface RatingCardProps {
   rating: any
   type: 'neighborhood' | 'building'
+  viewMode?: 'grid' | 'list'
 }
 
-export default function RatingCard({ rating, type }: RatingCardProps) {
+export default function RatingCard({ rating, type, viewMode = 'grid' }: RatingCardProps) {
   const [imageError, setImageError] = useState(false)
   const [imageLoaded, setImageLoaded] = useState(false)
   const [firstReviewImage, setFirstReviewImage] = useState<string | null>(null)
@@ -41,88 +42,121 @@ export default function RatingCard({ rating, type }: RatingCardProps) {
     ? `/neighborhood/${rating.slug || rating.id}` 
     : `/building/${rating.slug || rating.id}`
 
+  const hasRating = rating.average_rating && rating.average_rating > 0
+  const reviewCount = rating.total_reviews || 0
+
   return (
     <Link href={linkHref}>
-      <div className="bg-white rounded-2xl shadow-md overflow-hidden card-hover group">
+      <div className={`group relative bg-white rounded-2xl overflow-hidden border border-gray-200 hover:border-primary-300 shadow-lg hover:shadow-2xl transition-all duration-300 ${
+        viewMode === 'list' ? 'flex items-center space-x-6 p-6 hover:-translate-y-1' : 'hover:-translate-y-2'
+      }`}>
         {/* Image Section */}
-        <div className="h-48 bg-gradient-to-br from-primary-100 to-primary-200 relative overflow-hidden">
+        <div className={`${viewMode === 'list' ? 'w-32 h-24 flex-shrink-0' : 'h-56'} bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden rounded-xl`}>
           {/* Loading State */}
           {!imageLoaded && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-8 h-8 border-4 border-primary-200 border-t-primary-500 rounded-full animate-spin"></div>
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+              <div className="w-8 h-8 border-4 border-gray-300 border-t-primary-500 rounded-full animate-spin"></div>
             </div>
           )}
           
-          {/* Actual Image */}
-              <img 
-                src={displayImage}
-                alt={type === 'neighborhood' 
-                  ? `${rating.name} neighborhood in ${rating.city}, ${rating.province} - Rated ${rating.average_rating?.toFixed(1)}/5 stars with ${rating.total_ratings || 0} reviews` 
-                  : `${rating.name} apartment building at ${rating.city}, ${rating.province} - Rated ${rating.average_rating?.toFixed(1)}/5 stars`
-                } 
-                className={`w-full h-full object-cover transition-all duration-300 group-hover:scale-105 ${
+          {/* Image */}
+          <img 
+            src={displayImage}
+            alt={`${rating.name} in ${rating.city}`} 
+            className={`w-full h-full object-cover transition-all duration-500 group-hover:scale-110 ${
               imageLoaded ? 'opacity-100' : 'opacity-0'
             }`}
             onLoad={() => setImageLoaded(true)}
             onError={(e) => {
               setImageError(true)
               setImageLoaded(true)
-              // Try default image if user image fails
-              if (userImage && !imageError) {
+              if (firstReviewImage && !imageError) {
                 e.currentTarget.src = defaultImage
               }
             }}
           />
           
-              {/* Photo Badge */}
-              {imageLoaded && (
-                <>
-                  {rating.cover_image && (
-                    <div className="absolute top-3 right-3 bg-primary-500 text-white px-3 py-1 rounded-full text-xs font-semibold flex items-center space-x-1 shadow-lg">
-                      <Shield className="w-3 h-3" />
-                      <span>Featured</span>
-                    </div>
-                  )}
-                  {!rating.cover_image && firstReviewImage && !imageError && (
-                    <div className="absolute top-3 right-3 bg-green-500 text-white px-3 py-1 rounded-full text-xs font-semibold flex items-center space-x-1 shadow-lg">
-                      <div className="w-2 h-2 bg-white rounded-full"></div>
-                      <span>User Photo</span>
-                    </div>
-                  )}
-                </>
-              )}
+          {/* Gradient Overlay */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
           
-          {/* Total Reviews Badge (if available) */}
-          {rating.total_ratings && rating.total_ratings > 0 && imageLoaded && (
-            <div className="absolute bottom-3 left-3 bg-black/70 text-white px-3 py-1 rounded-full text-xs font-semibold flex items-center space-x-1">
-              <Users className="w-3 h-3" />
-              <span>{rating.total_ratings} {rating.total_ratings === 1 ? 'Review' : 'Reviews'}</span>
+          {/* Rating Badge - Top Right */}
+          {hasRating && (
+            <div className="absolute top-4 right-4 bg-white/95 backdrop-blur-md px-4 py-2 rounded-xl shadow-lg">
+              <div className="flex items-center space-x-2">
+                <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
+                <span className="font-bold text-xl text-gray-900">
+                  {(rating.average_rating || 0).toFixed(1)}
+                </span>
+              </div>
+            </div>
+          )}
+          
+          {/* Review Count - Bottom Left */}
+          {reviewCount > 0 && (
+            <div className="absolute bottom-4 left-4 bg-black/80 backdrop-blur-md text-white px-4 py-2 rounded-lg flex items-center space-x-2">
+              <Users className="w-4 h-4" />
+              <span className="font-semibold text-sm">{reviewCount} Review{reviewCount !== 1 ? 's' : ''}</span>
+            </div>
+          )}
+          
+          {/* No Rating Badge */}
+          {!hasRating && (
+            <div className="absolute top-4 right-4 bg-yellow-100 text-yellow-700 px-3 py-1.5 rounded-lg text-xs font-bold">
+              Not Rated Yet
             </div>
           )}
         </div>
 
         {/* Content Section */}
-        <div className="p-6">
-          <div className="flex items-start justify-between mb-2">
-            <h3 className="text-xl font-bold text-gray-900 group-hover:text-primary-600 transition-colors">
+        <div className={`${viewMode === 'list' ? 'flex-1' : 'p-6'}`}>
+          <div className="mb-3">
+            <h3 className="text-xl font-bold text-gray-900 group-hover:text-primary-600 transition-colors mb-2 line-clamp-2">
               {rating.name}
             </h3>
-            <div className="flex items-center space-x-1 bg-primary-50 px-3 py-1 rounded-full">
-              <Star className="w-4 h-4 text-primary-500 fill-primary-500" />
-              <span className="font-bold text-primary-600">
-                {rating.average_rating?.toFixed(1) || 'N/A'}
-              </span>
+            
+            {type === 'building' && rating.address && (
+              <p className="text-gray-600 text-sm mb-2 line-clamp-1">{rating.address}</p>
+            )}
+            
+            <div className="flex items-center space-x-2 text-gray-600 text-sm">
+              <MapPin className="w-4 h-4 text-primary-500 flex-shrink-0" />
+              <span className="line-clamp-1">{rating.city}, {rating.province}</span>
             </div>
           </div>
-          
-          {type === 'building' && rating.address && (
-            <p className="text-gray-600 text-sm mb-1">{rating.address}</p>
+
+          {/* Rating Breakdown */}
+          {hasRating ? (
+            <div className={`${viewMode === 'list' ? 'pt-2' : 'pt-4 border-t border-gray-100'}`}>
+              <div className={`flex items-center ${viewMode === 'list' ? 'justify-between' : 'justify-between'}`}>
+                <div className="flex items-center space-x-2">
+                  <div className="flex">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Star
+                        key={star}
+                        className={`w-4 h-4 ${
+                          star <= Math.round(rating.average_rating || 0)
+                            ? 'text-yellow-400 fill-yellow-400'
+                            : 'text-gray-300'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <span className="text-sm font-semibold text-gray-700">
+                    {(rating.average_rating || 0).toFixed(1)}
+                  </span>
+                </div>
+                <span className="text-xs text-gray-500 font-medium">
+                  {reviewCount} rating{reviewCount !== 1 ? 's' : ''}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className={`${viewMode === 'list' ? 'pt-2' : 'pt-4 border-t border-gray-100'}`}>
+              <div className={`${viewMode === 'list' ? 'text-left' : 'text-center py-2'}`}>
+                <p className="text-sm text-gray-500">Be the first to rate!</p>
+              </div>
+            </div>
           )}
-          
-          <p className="text-gray-600 flex items-center space-x-1 text-sm">
-            <MapPin className="w-4 h-4" />
-            <span>{rating.city}, {rating.province}</span>
-          </p>
         </div>
       </div>
     </Link>

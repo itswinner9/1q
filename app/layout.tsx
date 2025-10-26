@@ -7,41 +7,43 @@ const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
   title: {
-    default: 'NeighborhoodRank | Find Your Perfect Neighborhood & Apartment in Canada',
-    template: '%s | NeighborhoodRank'
+    default: 'LivRank | Real Reviews for Buildings, Landlords, and Neighborhoods',
+    template: '%s | LivRank'
   },
-  description: 'Discover the best neighborhoods and apartments in Canada with real reviews from residents. Compare safety, cleanliness, noise levels, transit access, management quality, and more. Make informed housing decisions with NeighborhoodRank.',
-  keywords: 'neighborhood reviews, apartment reviews, building ratings, Canada housing, rental reviews, neighborhood ratings, apartment ratings, condo reviews, tenant reviews, neighborhood safety, best neighborhoods Canada',
-  authors: [{ name: 'NeighborhoodRank' }],
-  creator: 'NeighborhoodRank',
-  publisher: 'NeighborhoodRank',
+  description: 'Discover honest reviews about apartments, neighborhoods, and landlords across Canada. See what real tenants say on LivRank - the trusted community for housing reviews.',
+  keywords: 'apartment reviews, landlord reviews, neighborhood reviews, building ratings, Canada housing, rental reviews, tenant reviews, condo reviews, property management reviews, neighborhood safety, best neighborhoods Canada, landlord ratings, apartment ratings',
+  authors: [{ name: 'LivRank' }],
+  creator: 'LivRank',
+  publisher: 'LivRank',
   formatDetection: {
     email: false,
     address: false,
     telephone: false,
   },
-  metadataBase: new URL('https://neighborhoodrank.com'),
+  metadataBase: new URL('https://livrank.ca'),
   openGraph: {
     type: 'website',
     locale: 'en_CA',
-    url: 'https://neighborhoodrank.com',
-    siteName: 'NeighborhoodRank',
-    title: 'NeighborhoodRank | Real Neighborhood & Apartment Reviews',
-    description: 'Find your perfect neighborhood or apartment with verified reviews from real residents across Canada.',
+    url: 'https://livrank.ca',
+    siteName: 'LivRank',
+    title: 'LivRank | Apartment & Neighborhood Ratings',
+    description: 'Rate and explore buildings, landlords, and neighborhoods in your city. Trusted by tenants across Canada.',
     images: [
       {
-        url: '/og-image.jpg',
+        url: '/og-image.png',
         width: 1200,
         height: 630,
-        alt: 'NeighborhoodRank - Find Your Perfect Place'
+        alt: 'LivRank - Real Reviews from Real Tenants'
       }
     ]
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'NeighborhoodRank | Real Neighborhood & Apartment Reviews',
-    description: 'Find your perfect neighborhood or apartment with verified reviews from real residents.',
-    images: ['/og-image.jpg']
+    title: 'LivRank | Apartment & Neighborhood Ratings',
+    description: 'Rate and explore buildings, landlords, and neighborhoods. Trusted by tenants across Canada.',
+    images: ['/og-image.png'],
+    site: '@livrank',
+    creator: '@livrank'
   },
   robots: {
     index: true,
@@ -59,6 +61,9 @@ export const metadata: Metadata = {
     // google: 'your-google-verification-code',
     // yandex: 'your-yandex-verification-code',
   },
+  alternates: {
+    canonical: 'https://livrank.ca',
+  },
 }
 
 export default function RootLayout({
@@ -72,7 +77,12 @@ export default function RootLayout({
         {/* Additional SEO tags */}
         <meta name="theme-color" content="#f97316" />
         <link rel="icon" href="/favicon.ico" />
-        <link rel="canonical" href="https://neighborhoodrank.com" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="LivRank" />
+        {/* Preconnect to Supabase for faster loading */}
+        <link rel="preconnect" href="https://eehtzdpzbjsuendgwnwy.supabase.co" />
+        <link rel="dns-prefetch" href="https://eehtzdpzbjsuendgwnwy.supabase.co" />
       </head>
       <body className={inter.className}>
         <Navigation />

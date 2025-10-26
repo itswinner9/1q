@@ -117,14 +117,12 @@ export default function PendingReviewsPage() {
     setActionLoading(reviewId)
     
     const table = type === 'neighborhood' ? 'neighborhood_reviews' : 'building_reviews'
-    const { data: { session } } = await supabase.auth.getSession()
     
     const { error } = await supabase
       .from(table)
       .update({
         status: 'approved',
-        approved_by: session?.user.id,
-        approved_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       })
       .eq('id', reviewId)
 
@@ -132,6 +130,7 @@ export default function PendingReviewsPage() {
       alert('✅ Review Approved!\n\nThis review is now:\n• Visible to all users\n• Counted in location stats\n• Displayed on cards and detail pages\n\nThe user can see it on their profile.')
       fetchPendingReviews()
     } else {
+      console.error('Approve error:', error)
       alert('❌ Error: ' + error.message)
     }
     
@@ -139,17 +138,17 @@ export default function PendingReviewsPage() {
   }
 
   const handleReject = async (reviewId: string, type: string) => {
+    setActionLoading(reviewId)
+    
     const reason = prompt('Why are you rejecting this review? (Optional - will be shown to user)')
 
     const table = type === 'neighborhood' ? 'neighborhood_reviews' : 'building_reviews'
-    const { data: { session } } = await supabase.auth.getSession()
     
     const { error } = await supabase
       .from(table)
       .update({ 
         status: 'rejected',
-        rejection_reason: reason || 'Review did not meet our guidelines',
-        approved_by: session?.user.id
+        updated_at: new Date().toISOString(),
       })
       .eq('id', reviewId)
 
@@ -157,8 +156,11 @@ export default function PendingReviewsPage() {
       alert('✅ Review Rejected\n\nThe review has been rejected and hidden from public view.')
       fetchPendingReviews()
     } else {
+      console.error('Reject error:', error)
       alert('❌ Error: ' + error.message)
     }
+    
+    setActionLoading(null)
   }
 
   const filteredReviews = reviews.filter(r => {

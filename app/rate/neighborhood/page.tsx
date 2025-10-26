@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Star, Upload, X, MapPin, Shield, Sparkles, Volume2, Users, Train, Package } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import MapboxAutocomplete from '@/components/MapboxAutocomplete'
+import PhotonAutocomplete from '@/components/PhotonAutocomplete'
 
 interface RatingCategory {
   id: string
@@ -18,6 +18,7 @@ function RateNeighborhoodForm() {
   const searchParams = useSearchParams()
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(false)
+  const [userLoading, setUserLoading] = useState(true)
   const [name, setName] = useState('')
   const [city, setCity] = useState('')
   const [province, setProvince] = useState('')
@@ -40,13 +41,35 @@ function RateNeighborhoodForm() {
   ])
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
-        router.push('/login?redirect=/rate/neighborhood')
-      } else {
+    const checkAuth = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession()
+        
+        if (error) {
+          console.error('Auth error:', error)
+          setUserLoading(false)
+          router.push('/login?redirect=/rate/neighborhood')
+          return
+        }
+        
+        if (!session) {
+          console.log('No session found, redirecting to login')
+          setUserLoading(false)
+          router.push('/login?redirect=/rate/neighborhood')
+          return
+        }
+        
+        console.log('User authenticated:', session.user.email)
         setUser(session.user)
+        setUserLoading(false)
+      } catch (error) {
+        console.error('Auth check failed:', error)
+        setUserLoading(false)
+        router.push('/login?redirect=/rate/neighborhood')
       }
-    })
+    }
+    
+    checkAuth()
     
     // Check for pre-fill data from URL
     const prefillData = searchParams?.get('prefill')
@@ -96,28 +119,53 @@ function RateNeighborhoodForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!user) {
-      router.push('/login')
+    // Prevent double submission
+    if (loading) {
+      console.log('Already submitting, please wait...')
       return
     }
-
+    
+    // Validate form
     if (!name || !city || !province) {
-      alert('Please fill in neighborhood name, city, and province')
+      alert('❌ Please fill in neighborhood name, city, and province')
       return
     }
 
     if (ratings.some(r => r.value === 0)) {
-      alert('Please rate all categories')
+      alert('❌ Please rate all categories')
       return
     }
+    
+    // Double-check user is logged in by getting current session
+    console.log('Checking authentication before submit...')
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    
+    if (sessionError) {
+      console.error('Session error:', sessionError)
+      alert('❌ Authentication error. Please try logging in again.')
+      router.push('/login?redirect=/rate/neighborhood')
+      return
+    }
+    
+    if (!session || !session.user) {
+      console.log('No session found')
+      alert('❌ You must be logged in to submit a rating. Redirecting to login...')
+      router.push('/login?redirect=/rate/neighborhood')
+      return
+    }
+    
+    console.log('✅ User authenticated:', session.user.email)
 
     setLoading(true)
 
     try {
+      // Use session user
+      const currentUser = session.user
+      console.log('Submitting rating for user:', currentUser.id)
       // Upload images to Supabase Storage
       const imageUrls: string[] = []
       for (const image of images) {
-        const fileName = `neighborhoods/${user.id}/${Date.now()}-${image.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
+        const fileName = `neighborhoods/${currentUser.id}/${Date.now()}-${image.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
         
         const { data, error } = await supabase.storage
           .from('neighborhood-images')
@@ -207,7 +255,7 @@ function RateNeighborhoodForm() {
         .from('neighborhood_reviews')
         .select('id')
         .eq('neighborhood_id', neighborhoodId)
-        .eq('user_id', user.id)
+        .eq('user_id', currentUser.id)
         .maybeSingle()
 
       if (reviewSearchError && reviewSearchError.code !== 'PGRST116') {
@@ -219,17 +267,28 @@ function RateNeighborhoodForm() {
         // User already reviewed - UPDATE their review
         console.log('✅ Updating your existing review...')
         
+        // Recalculate average for update
+        const updateAvgRating = (
+          (ratings.find(r => r.id === 'safety')?.value || 0) +
+          (ratings.find(r => r.id === 'cleanliness')?.value || 0) +
+          (ratings.find(r => r.id === 'noise')?.value || 0) +
+          (ratings.find(r => r.id === 'community')?.value || 0) +
+          (ratings.find(r => r.id === 'transit')?.value || 0) +
+          (ratings.find(r => r.id === 'amenities')?.value || 0)
+        ) / 6
+
         const { error: updateError } = await supabase
           .from('neighborhood_reviews')
           .update({
+            review: comment || 'No review text provided', // Required field
+            overall_rating: Math.round(updateAvgRating), // Required field - round to integer
             safety: ratings.find(r => r.id === 'safety')?.value,
             cleanliness: ratings.find(r => r.id === 'cleanliness')?.value,
             noise: ratings.find(r => r.id === 'noise')?.value,
             community: ratings.find(r => r.id === 'community')?.value,
             transit: ratings.find(r => r.id === 'transit')?.value,
             amenities: ratings.find(r => r.id === 'amenities')?.value,
-            comment: comment || null,
-            images: imageUrls,
+            comment: comment || null, // Keep for backwards compatibility
             is_anonymous: isAnonymous,
             display_name: !isAnonymous ? displayName : null,
             updated_at: new Date().toISOString(),
@@ -247,22 +306,35 @@ function RateNeighborhoodForm() {
         // User hasn't reviewed yet - CREATE new review
         console.log('✅ Creating your new review...')
         
+        // Calculate average rating
+        const safetyVal = ratings.find(r => r.id === 'safety')?.value || 0
+        const cleanlinessVal = ratings.find(r => r.id === 'cleanliness')?.value || 0
+        const noiseVal = ratings.find(r => r.id === 'noise')?.value || 0
+        const communityVal = ratings.find(r => r.id === 'community')?.value || 0
+        const transitVal = ratings.find(r => r.id === 'transit')?.value || 0
+        const amenitiesVal = ratings.find(r => r.id === 'amenities')?.value || 0
+        const avgRating = (safetyVal + cleanlinessVal + noiseVal + communityVal + transitVal + amenitiesVal) / 6
+        
+        // Auto-approve if rating is 2 stars or higher, otherwise pending
+        const reviewStatus = avgRating >= 2 ? 'approved' : 'pending'
+        
         const { error: insertError } = await supabase
           .from('neighborhood_reviews')
           .insert({
             neighborhood_id: neighborhoodId,
-            user_id: user.id,
-            safety: ratings.find(r => r.id === 'safety')?.value,
-            cleanliness: ratings.find(r => r.id === 'cleanliness')?.value,
-            noise: ratings.find(r => r.id === 'noise')?.value,
-            community: ratings.find(r => r.id === 'community')?.value,
-            transit: ratings.find(r => r.id === 'transit')?.value,
-            amenities: ratings.find(r => r.id === 'amenities')?.value,
-            comment: comment || null,
-            images: imageUrls,
+            user_id: currentUser.id,
+            review: comment || 'No review text provided', // Required field
+            overall_rating: Math.round(avgRating), // Required field - round to integer
+            safety: safetyVal,
+            cleanliness: cleanlinessVal,
+            noise: noiseVal,
+            community: communityVal,
+            transit: transitVal,
+            amenities: amenitiesVal,
+            comment: comment || null, // Keep for backwards compatibility
             is_anonymous: isAnonymous,
             display_name: !isAnonymous ? displayName : null,
-            status: 'pending',
+            status: reviewStatus,
           })
 
         if (insertError) {
@@ -276,29 +348,40 @@ function RateNeighborhoodForm() {
 
     // Calculate average rating to determine if it needs approval
     const avgRating = (
-      ratings.find(r => r.id === 'safety')?.value +
-      ratings.find(r => r.id === 'cleanliness')?.value +
-      ratings.find(r => r.id === 'noise')?.value +
-      ratings.find(r => r.id === 'community')?.value +
-      ratings.find(r => r.id === 'transit')?.value +
-      ratings.find(r => r.id === 'amenities')?.value
+      (ratings.find(r => r.id === 'safety')?.value || 0) +
+      (ratings.find(r => r.id === 'cleanliness')?.value || 0) +
+      (ratings.find(r => r.id === 'noise')?.value || 0) +
+      (ratings.find(r => r.id === 'community')?.value || 0) +
+      (ratings.find(r => r.id === 'transit')?.value || 0) +
+      (ratings.find(r => r.id === 'amenities')?.value || 0)
     ) / 6
 
     // Show appropriate success message
-    if (avgRating >= 3) {
-      alert('✅ Rating Submitted Successfully!\n\n🎉 Your review has been APPROVED and is now LIVE!\n\nOther users can now see your review.\n\nThank you for contributing!')
-    } else {
-      alert('✅ Rating Submitted Successfully!\n\n⏳ Your review is under admin review.\n\nWhy? Reviews with 2 stars or less need admin approval to prevent abuse.\n\nYou will be notified once approved.\n\nThank you for your honest feedback!')
-    }
+    alert('✅ Rating Submitted Successfully!\n\n⏳ Your review is now pending admin approval.\n\nOur team will review it within 24 hours.\n\nYou will be notified once approved.\n\nThank you for contributing!')
     
     // Redirect to the newly created rating or explore
-    router.push('/explore?success=true')
-    } catch (error) {
-      console.error('Error submitting rating:', error)
-      alert('Error submitting rating. Please try again.')
-    } finally {
+    router.push('/explore?success=pending')
+    } catch (error: any) {
+      console.error('❌ Error submitting rating:', error)
+      alert('Error submitting rating:\n\n' + (error.message || error.toString() || 'Unknown error') + '\n\nCheck browser console for details.')
       setLoading(false)
     }
+  }
+
+  // Show loading state while checking auth
+  if (userLoading) {
+    return (
+      <main className="min-h-screen bg-gray-50 py-12 px-4">
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-white rounded-3xl shadow-lg p-8 md:p-12">
+            <div className="flex flex-col items-center justify-center py-20">
+              <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-200 border-t-primary-500 mb-4"></div>
+              <p className="text-gray-600">Loading form...</p>
+            </div>
+          </div>
+        </div>
+      </main>
+    )
   }
 
   return (
@@ -350,14 +433,16 @@ function RateNeighborhoodForm() {
                 </div>
               </div>
             ) : (
-              <MapboxAutocomplete
-                type="neighborhood"
-                onLocationSelect={(data) => {
-                  setName(data.name)
-                  setCity(data.city)
-                  setProvince(data.province)
-                  setLatitude(data.latitude)
-                  setLongitude(data.longitude)
+              <PhotonAutocomplete
+                placeholder="Search for a neighborhood in Canada..."
+                onLocationSelect={(query, data) => {
+                  if (data) {
+                    setName(data.name || query)
+                    setCity(data.city || '')
+                    setProvince(data.province || '')
+                    setLatitude(data.latitude || 0)
+                    setLongitude(data.longitude || 0)
+                  }
                 }}
               />
             )}
@@ -470,36 +555,80 @@ function RateNeighborhoodForm() {
 
             {/* Ratings */}
             <div className="space-y-6">
-              <h2 className="text-xl font-bold text-gray-900">Rate Categories</h2>
-              <p className="text-gray-600">Click on stars to rate (1 = Poor, 5 = Excellent)</p>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {ratings.map((category) => (
-                  <div key={category.id} className="bg-gray-50 rounded-xl p-6">
-                    <div className="flex items-center space-x-2 mb-4">
-                      <div className="text-primary-500">{category.icon}</div>
-                      <span className="font-semibold text-gray-900">{category.label}</span>
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 mb-2">Rate Your Neighborhood Experience</h2>
+                <div className="bg-gradient-to-r from-blue-50 to-primary-50 rounded-xl p-5 border border-blue-200">
+                  <div className="flex items-start space-x-3">
+                    <div className="text-blue-600 mt-1">
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
                     </div>
-                    <div className="flex space-x-2">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <button
-                          key={star}
-                          type="button"
-                          onClick={() => handleRatingChange(category.id, star)}
-                          className="transition-all duration-200 hover:scale-110"
-                        >
-                          <Star
-                            className={`w-8 h-8 ${
-                              star <= category.value
-                                ? 'text-primary-500 fill-primary-500'
-                                : 'text-gray-300'
-                            }`}
-                          />
-                        </button>
-                      ))}
+                    <div className="flex-1">
+                      <h3 className="font-bold text-gray-900 mb-2">How to Rate:</h3>
+                      <ul className="text-sm text-gray-700 space-y-1">
+                        <li><strong>⭐ 1 Star:</strong> Very Poor - Major problems, not recommended</li>
+                        <li><strong>⭐⭐ 2 Stars:</strong> Poor - Significant issues</li>
+                        <li><strong>⭐⭐⭐ 3 Stars:</strong> Average - Acceptable with some concerns</li>
+                        <li><strong>⭐⭐⭐⭐ 4 Stars:</strong> Good - Minor issues, generally satisfied</li>
+                        <li><strong>⭐⭐⭐⭐⭐ 5 Stars:</strong> Excellent - Highly recommended!</li>
+                      </ul>
+                      <p className="text-xs text-gray-600 mt-3 bg-white/50 p-2 rounded">
+                        💡 <strong>Tip:</strong> If a neighborhood already exists in our database, your rating will be added to it automatically - no duplicates!
+                      </p>
                     </div>
                   </div>
-                ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {ratings.map((category) => {
+                  const descriptions: Record<string, string> = {
+                    safety: 'How safe do you feel walking day and night?',
+                    cleanliness: 'How clean are streets, parks, and public areas?',
+                    noise: 'How quiet is it? Traffic, nightlife, construction noise?',
+                    community: 'How friendly are neighbors? Community events?',
+                    transit: 'Access to public transport, buses, subway, trains?',
+                    amenities: 'Nearby shops, restaurants, parks, schools, services?'
+                  }
+                  
+                  return (
+                    <div key={category.id} className="bg-white border-2 border-gray-200 rounded-xl p-6 hover:border-primary-300 transition-colors">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <div className="text-primary-600">{category.icon}</div>
+                        <span className="font-bold text-gray-900">{category.label}</span>
+                      </div>
+                      <p className="text-xs text-gray-600 mb-4">{descriptions[category.id]}</p>
+                      <div className="flex space-x-2">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <button
+                            key={star}
+                            type="button"
+                            onClick={() => handleRatingChange(category.id, star)}
+                            className="transition-all duration-200 hover:scale-125 focus:outline-none focus:ring-2 focus:ring-primary-300 rounded"
+                          >
+                            <Star
+                              className={`w-8 h-8 ${
+                                star <= category.value
+                                  ? 'text-primary-500 fill-primary-500 drop-shadow'
+                                  : 'text-gray-300 hover:text-gray-400'
+                              }`}
+                            />
+                          </button>
+                        ))}
+                      </div>
+                      {category.value > 0 && (
+                        <p className="text-sm font-semibold text-primary-600 mt-2">
+                          {category.value === 5 ? '🎉 Excellent!' : 
+                           category.value === 4 ? '👍 Good' : 
+                           category.value === 3 ? '👌 Average' : 
+                           category.value === 2 ? '⚠️ Poor' : 
+                           '❌ Very Poor'}
+                        </p>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             </div>
 
@@ -549,10 +678,20 @@ function RateNeighborhoodForm() {
               </button>
               <button
                 type="submit"
-                disabled={loading}
-                className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={loading || userLoading}
+                className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed min-w-[150px] relative"
               >
-                {loading ? 'Submitting...' : 'Submit Rating'}
+                {loading ? (
+                  <span className="flex items-center justify-center">
+                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Submitting...
+                  </span>
+                ) : (
+                  'Submit Rating'
+                )}
               </button>
             </div>
           </form>

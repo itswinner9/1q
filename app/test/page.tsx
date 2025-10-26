@@ -1,203 +1,139 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import Link from 'next/link'
+import { useEffect, useState } from 'react'
 import { supabase, supabaseConfigured } from '@/lib/supabase'
-import { CheckCircle, XCircle, RefreshCw } from 'lucide-react'
+import Link from 'next/link'
 
 export default function TestPage() {
-  const [results, setResults] = useState<any>({})
-  const [testing, setTesting] = useState(true)
+  const [status, setStatus] = useState<'checking' | 'success' | 'error'>('checking')
+  const [details, setDetails] = useState<any>({})
 
   useEffect(() => {
-    runTests()
-  }, [])
-
-  const runTests = async () => {
-    setTesting(true)
-    const testResults: any = {}
-
-    // Test 1: Environment Variables
-    testResults.envUrl = !!process.env.NEXT_PUBLIC_SUPABASE_URL
-    testResults.envKey = !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-    testResults.configured = supabaseConfigured
-
-    console.log('Environment Check:', {
-      url: testResults.envUrl ? 'Set' : 'Missing',
-      key: testResults.envKey ? 'Set' : 'Missing',
-      urlValue: process.env.NEXT_PUBLIC_SUPABASE_URL
-    })
-
-    // Test 2: Supabase Connection
-    if (supabaseConfigured) {
+    const testConnection = async () => {
       try {
-        const start = Date.now()
-        const { data, error } = await supabase.auth.getSession()
-        const elapsed = Date.now() - start
-        
-        testResults.connectionTime = `${elapsed}ms`
-        testResults.connectionWorks = !error
-        testResults.connectionError = error?.message || null
-      } catch (err: any) {
-        testResults.connectionWorks = false
-        testResults.connectionError = err.message
-      }
+        // Check if environment variables are loaded
+        const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+        const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-      // Test 3: Database Query
-      try {
-        const { data, error } = await supabase
-          .from('user_profiles')
-          .select('count')
-          .limit(1)
-        
-        testResults.dbWorks = !error
-        testResults.dbError = error?.message || null
+        console.log('Testing Supabase connection...')
+        console.log('URL:', url ? '✅' : '❌')
+        console.log('Key:', key ? '✅' : '❌')
+        console.log('Configured:', supabaseConfigured ? '✅' : '❌')
+
+        setDetails({
+          envUrl: url ? '✅ Set' : '❌ Missing',
+          envKey: key ? '✅ Set' : '❌ Missing',
+          configured: supabaseConfigured ? '✅ Yes' : '❌ No',
+        })
+
+        if (!supabaseConfigured) {
+          setStatus('error')
+          return
+        }
+
+        // Try to connect to Supabase
+        const { data, error } = await supabase.from('user_profiles').select('count').limit(1)
+
+        if (error) {
+          console.error('Database query error:', error)
+          setDetails(prev => ({
+            ...prev,
+            dbError: error.message,
+            dbConnection: '❌ Failed'
+          }))
+          setStatus('error')
+        } else {
+          console.log('✅ Database connection successful!')
+          setDetails(prev => ({
+            ...prev,
+            dbConnection: '✅ Connected'
+          }))
+          setStatus('success')
+        }
       } catch (err: any) {
-        testResults.dbWorks = false
-        testResults.dbError = err.message
+        console.error('Test error:', err)
+        setDetails(prev => ({
+          ...prev,
+          exception: err.message
+        }))
+        setStatus('error')
       }
     }
 
-    setResults(testResults)
-    setTesting(false)
-  }
+    testConnection()
+  }, [])
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4">
+    <main className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-gray-50 p-8">
       <div className="max-w-2xl mx-auto">
         <div className="bg-white rounded-3xl shadow-xl p-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-8">🔧 Supabase Connection Test</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-6">🔧 System Test</h1>
 
-          <div className="space-y-4">
-            {/* Test 1: Environment Variables */}
-            <div className="p-6 bg-gray-50 rounded-xl">
-              <h2 className="font-bold text-lg mb-4">1. Environment Variables</h2>
+          {status === 'checking' && (
+            <div className="flex items-center space-x-3 text-gray-600">
+              <div className="w-5 h-5 border-2 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
+              <span>Testing connection...</span>
+            </div>
+          )}
+
+          {status === 'success' && (
+            <div className="space-y-4">
+              <div className="bg-green-50 border-2 border-green-500 rounded-xl p-4">
+                <h2 className="text-xl font-bold text-green-900 mb-2">✅ All Systems Go!</h2>
+                <p className="text-green-700">Your app is properly configured and connected.</p>
+              </div>
+
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-700">NEXT_PUBLIC_SUPABASE_URL</span>
-                  {results.envUrl ? (
-                    <CheckCircle className="w-5 h-5 text-green-600" />
-                  ) : (
-                    <XCircle className="w-5 h-5 text-red-600" />
-                  )}
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-700">NEXT_PUBLIC_SUPABASE_ANON_KEY</span>
-                  {results.envKey ? (
-                    <CheckCircle className="w-5 h-5 text-green-600" />
-                  ) : (
-                    <XCircle className="w-5 h-5 text-red-600" />
-                  )}
-                </div>
+                {Object.entries(details).map(([key, value]) => (
+                  <div key={key} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                    <span className="font-semibold text-gray-700">{key}:</span>
+                    <span className="text-gray-900">{value as string}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-6 flex gap-3">
+                <Link href="/login" className="btn-primary">
+                  Try Login
+                </Link>
+                <Link href="/signup" className="btn-secondary">
+                  Try Signup
+                </Link>
               </div>
             </div>
+          )}
 
-            {/* Test 2: Supabase Connection */}
-            {results.configured && (
-              <div className="p-6 bg-gray-50 rounded-xl">
-                <h2 className="font-bold text-lg mb-4">2. Supabase Connection</h2>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-700">Connection Status</span>
-                    {results.connectionWorks ? (
-                      <span className="text-green-600 font-semibold">✅ Connected</span>
-                    ) : (
-                      <span className="text-red-600 font-semibold">❌ Failed</span>
-                    )}
-                  </div>
-                  {results.connectionTime && (
-                    <div className="text-sm text-gray-600">
-                      Response time: {results.connectionTime}
-                    </div>
-                  )}
-                  {results.connectionError && (
-                    <div className="text-sm text-red-600">
-                      Error: {results.connectionError}
-                    </div>
-                  )}
-                </div>
+          {status === 'error' && (
+            <div className="space-y-4">
+              <div className="bg-red-50 border-2 border-red-500 rounded-xl p-4">
+                <h2 className="text-xl font-bold text-red-900 mb-2">❌ Configuration Error</h2>
+                <p className="text-red-700 mb-4">There's an issue with your setup.</p>
               </div>
-            )}
 
-            {/* Test 3: Database Query */}
-            {results.configured && (
-              <div className="p-6 bg-gray-50 rounded-xl">
-                <h2 className="font-bold text-lg mb-4">3. Database Access</h2>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-700">user_profiles table</span>
-                    {results.dbWorks ? (
-                      <span className="text-green-600 font-semibold">✅ Accessible</span>
-                    ) : (
-                      <span className="text-red-600 font-semibold">❌ Not found</span>
-                    )}
+              <div className="space-y-2">
+                {Object.entries(details).map(([key, value]) => (
+                  <div key={key} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                    <span className="font-semibold text-gray-700">{key}:</span>
+                    <span className="text-gray-900">{value as string}</span>
                   </div>
-                  {results.dbError && (
-                    <div className="text-sm text-red-600">
-                      Error: {results.dbError}
-                    </div>
-                  )}
-                </div>
+                ))}
               </div>
-            )}
 
-            {/* Recommendations */}
-            <div className={`p-6 rounded-xl border-2 ${
-              results.envUrl && results.envKey && results.connectionWorks && results.dbWorks
-                ? 'bg-green-50 border-green-500'
-                : 'bg-red-50 border-red-500'
-            }`}>
-              <h2 className="font-bold text-lg mb-4">
-                {results.envUrl && results.envKey && results.connectionWorks && results.dbWorks
-                  ? '✅ Everything Works!'
-                  : '❌ Action Required'}
-              </h2>
-              <div className="space-y-2 text-sm">
-                {!results.envUrl || !results.envKey ? (
-                  <>
-                    <p className="text-red-800 font-semibold">Environment variables missing!</p>
-                    <p className="text-red-700">1. Check .env.local exists in project root</p>
-                    <p className="text-red-700">2. Restart dev server: <code className="bg-red-100 px-1 rounded">npm run dev</code></p>
-                    <p className="text-red-700">3. Hard refresh browser: Ctrl+Shift+R</p>
-                  </>
-                ) : !results.connectionWorks ? (
-                  <>
-                    <p className="text-red-800 font-semibold">Can&apos;t connect to Supabase!</p>
-                    <p className="text-red-700">Check Supabase project is online</p>
-                    <p className="text-red-700">Verify URL and key are correct</p>
-                  </>
-                ) : !results.dbWorks ? (
-                  <>
-                    <p className="text-red-800 font-semibold">Database tables missing!</p>
-                    <p className="text-red-700">Run ULTIMATE_FIX.sql in Supabase SQL Editor</p>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-green-800 font-semibold">All systems operational! ✨</p>
-                    <p className="text-green-700">You can now use login, profile, and admin features</p>
-                  </>
-                )}
+              <div className="bg-yellow-50 border border-yellow-300 rounded-xl p-4 mt-4">
+                <h3 className="font-bold text-yellow-900 mb-2">🔧 How to Fix:</h3>
+                <ol className="text-yellow-800 text-sm space-y-2 list-decimal list-inside">
+                  <li>Check that <code className="bg-yellow-100 px-1 rounded">.env.local</code> exists in project root</li>
+                  <li>Verify it has valid Supabase credentials</li>
+                  <li>Kill the dev server (Ctrl+C)</li>
+                  <li>Restart: <code className="bg-yellow-100 px-1 rounded">npm run dev</code></li>
+                  <li>Hard refresh browser: <code className="bg-yellow-100 px-1 rounded">Cmd+Shift+R</code></li>
+                  <li>Run <code className="bg-yellow-100 px-1 rounded">DATABASE_FINAL.sql</code> in Supabase</li>
+                </ol>
               </div>
             </div>
-          </div>
-
-          {/* Actions */}
-          <div className="mt-6 flex gap-4">
-            <button 
-              onClick={runTests} 
-              disabled={testing}
-              className="btn-primary disabled:opacity-50"
-            >
-              <RefreshCw className={`w-5 h-5 ${testing ? 'animate-spin' : ''}`} />
-              <span>{testing ? 'Testing...' : 'Run Tests Again'}</span>
-            </button>
-            <Link href="/login" className="btn-secondary">
-              Go to Login
-            </Link>
-          </div>
+          )}
         </div>
       </div>
-    </div>
+    </main>
   )
 }
-

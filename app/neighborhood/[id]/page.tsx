@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import type { Neighborhood, NeighborhoodReview } from '@/lib/supabase'
 import { generateNeighborhoodStructuredData } from '@/lib/seo'
+import ReviewVoting from '@/components/ReviewVoting'
 
 export const dynamic = 'force-dynamic'
 
@@ -149,140 +150,181 @@ export default function NeighborhoodDetail() {
           <span className="font-medium">Back to Explore</span>
         </Link>
 
-        <div className="bg-white rounded-3xl shadow-xl overflow-hidden border border-gray-100">
-          {/* Image Gallery */}
-          {allImages.length > 0 && (
-            <div className="relative h-[500px] bg-gradient-to-br from-primary-100 to-primary-200">
-              <img
-                src={allImages[currentImageIndex]}
-                alt={`${neighborhood.name} - Image ${currentImageIndex + 1}`}
-                className="w-full h-full object-cover"
-              />
-              
-              {allImages.length > 1 && (
-                <>
+        <div className="bg-white rounded-2xl shadow-2xl overflow-hidden border border-gray-200">
+          {/* Cover Image / Image Gallery */}
+          <div className="relative h-[400px] lg:h-[500px] bg-gradient-to-br from-blue-500 to-blue-600 overflow-hidden">
+            {/* Cover Image or User Photos */}
+            {(neighborhood.cover_image || allImages.length > 0) ? (
+              <>
+                <img
+                  src={neighborhood.cover_image || allImages[currentImageIndex]}
+                  alt={`${neighborhood.name} in ${neighborhood.city}`}
+                  className="w-full h-full object-cover"
+                  onClick={() => {
+                    if (allImages.length > 0) {
+                      setShowImageGallery(true)
+                      setSelectedImageIndex(currentImageIndex)
+                    }
+                  }}
+                />
+                
+                {/* Gradient Overlay */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20"></div>
+                
+                
+                {/* Photo Count */}
+                {allImages.length > 0 && (
                   <button
-                    onClick={prevImage}
-                    className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/90 p-2 rounded-full shadow-lg hover:bg-white transition-all"
+                    onClick={() => {
+                      setShowImageGallery(true)
+                      setSelectedImageIndex(0)
+                    }}
+                    className="absolute bottom-4 right-4 bg-black/80 backdrop-blur-md text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-black/90 transition-all"
                   >
-                    <ChevronLeft className="w-6 h-6 text-gray-900" />
+                    <Camera className="w-4 h-4" />
+                    <span className="font-semibold text-sm">{allImages.length} Photo{allImages.length !== 1 ? 's' : ''}</span>
                   </button>
-                  <button
-                    onClick={nextImage}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/90 p-2 rounded-full shadow-lg hover:bg-white transition-all"
-                  >
-                    <ChevronRight className="w-6 h-6 text-gray-900" />
-                  </button>
-                  
-                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex space-x-2">
-                    {allImages.map((_, index) => (
-                      <button
-                        key={index}
-                        onClick={() => setCurrentImageIndex(index)}
-                        className={`w-2 h-2 rounded-full transition-all ${
-                          index === currentImageIndex
-                            ? 'bg-white w-8'
-                            : 'bg-white/50 hover:bg-white/75'
-                        }`}
-                      />
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-
-          {/* Content */}
-          <div className="p-8 md:p-12">
-            {/* Header Section - Improved */}
-            <div className="mb-10">
-              {/* Location Badge */}
-              <div className="inline-flex items-center space-x-2 bg-primary-50 px-4 py-2 rounded-full mb-4">
-                <MapPin className="w-4 h-4 text-primary-600" />
-                <span className="text-sm font-semibold text-primary-700">
-                  {neighborhood.city}, {neighborhood.province}, Canada
-                </span>
-              </div>
-              
-              {/* Main Title */}
-              <h1 className="text-5xl font-bold text-gray-900 mb-4 leading-tight">
-                {neighborhood.name}
-              </h1>
-              
-              <p className="text-xl text-gray-600 mb-6">
-                Neighborhood Reviews & Ratings
-              </p>
-
-              {/* Rating Summary Bar */}
-              <div className="bg-gradient-to-br from-primary-500 to-primary-600 rounded-2xl p-8 text-white shadow-xl">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
-                  {/* Overall Rating */}
-                  <div className="text-center md:text-left">
-                    <div className="text-6xl font-bold mb-2">
-                      {reviews.length > 0 
-                        ? (reviews.reduce((sum, r) => sum + ((r.safety + r.cleanliness + r.noise + r.community + r.transit + r.amenities) / 6), 0) / reviews.length).toFixed(1)
-                        : neighborhood.average_rating.toFixed(1)
-                      }
-                    </div>
-                    <div className="flex items-center justify-center md:justify-start space-x-1 mb-2">
-                      {[...Array(5)].map((_, i) => (
-                        <Star
-                          key={i}
-                          className={`w-6 h-6 ${
-                            i < Math.round(reviews.length > 0 
-                              ? reviews.reduce((sum, r) => sum + ((r.safety + r.cleanliness + r.noise + r.community + r.transit + r.amenities) / 6), 0) / reviews.length
-                              : neighborhood.average_rating)
-                              ? 'text-white fill-white'
-                              : 'text-white/30'
+                )}
+                
+                {/* Navigation for multiple images */}
+                {allImages.length > 1 && !neighborhood.cover_image && (
+                  <>
+                    <button
+                      onClick={prevImage}
+                      className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/95 backdrop-blur-md p-3 rounded-full shadow-xl hover:bg-white transition-all"
+                    >
+                      <ChevronLeft className="w-6 h-6 text-gray-900" />
+                    </button>
+                    <button
+                      onClick={nextImage}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/95 backdrop-blur-md p-3 rounded-full shadow-xl hover:bg-white transition-all"
+                    >
+                      <ChevronRight className="w-6 h-6 text-gray-900" />
+                    </button>
+                    
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex space-x-2">
+                      {allImages.map((_, index) => (
+                        <button
+                          key={index}
+                          onClick={() => setCurrentImageIndex(index)}
+                          className={`h-2 rounded-full transition-all ${
+                            index === currentImageIndex
+                              ? 'bg-white w-8'
+                              : 'bg-white/60 hover:bg-white/80 w-2'
                           }`}
                         />
                       ))}
                     </div>
-                    <div className="text-primary-100 font-medium">Overall Rating</div>
-                  </div>
-
-                  {/* Stats */}
-                  <div className="grid grid-cols-2 gap-4 md:col-span-2">
-                    <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 text-center">
-                      <div className="text-3xl font-bold mb-1">{reviews.length}</div>
-                      <div className="text-primary-100 text-sm">Total Reviews</div>
-                    </div>
-                    <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 text-center">
-                      <div className="text-3xl font-bold mb-1">{allImages.length}</div>
-                      <div className="text-primary-100 text-sm">User Photos</div>
-                    </div>
-                    <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 text-center">
-                      <div className="flex items-center justify-center space-x-2">
-                        <Calendar className="w-5 h-5" />
-                        <span className="text-lg font-semibold">Latest</span>
-                      </div>
-                      <div className="text-primary-100 text-sm mt-1">
-                        {new Date(neighborhood.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
-                      </div>
-                    </div>
-                    <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 text-center">
-                      <div className="flex items-center justify-center space-x-2">
-                        <Shield className="w-5 h-5" />
-                        <span className="text-lg font-semibold">Verified</span>
-                      </div>
-                      <div className="text-primary-100 text-sm mt-1">All Reviews</div>
-                    </div>
+                  </>
+                )}
+              </>
+            ) : (
+              // Default gradient background if no images
+              <div className="w-full h-full flex items-center justify-center">
+                <div className="text-center text-white">
+                  <MapPin className="w-24 h-24 mx-auto mb-4 opacity-50" />
+                  <p className="text-2xl font-bold opacity-75">{neighborhood.name}</p>
+                  <p className="text-lg opacity-60">{neighborhood.city}, {neighborhood.province}</p>
+                </div>
+              </div>
+            )}
+            
+            {/* Location Info Overlay */}
+            <div className="absolute bottom-0 left-0 right-0 p-6 lg:p-8">
+              <div className="flex items-end justify-between">
+                <div className="text-white">
+                  <h1 className="text-3xl lg:text-4xl xl:text-5xl font-bold mb-2 drop-shadow-lg">
+                    {neighborhood.name}
+                  </h1>
+                  <div className="flex items-center space-x-2 text-white/90 text-base lg:text-lg drop-shadow-md">
+                    <MapPin className="w-5 h-5" />
+                    <span>{neighborhood.city}, {neighborhood.province}, Canada</span>
                   </div>
                 </div>
+                
+                {/* Rating Badge */}
+                {neighborhood.average_rating > 0 && (
+                  <div className="bg-white/95 backdrop-blur-md px-6 py-4 rounded-2xl shadow-2xl">
+                    <div className="text-center">
+                      <div className="flex items-center justify-center space-x-2 mb-1">
+                        <Star className="w-6 h-6 text-yellow-500 fill-yellow-500" />
+                        <span className="text-4xl font-bold text-gray-900">
+                          {neighborhood.average_rating.toFixed(1)}
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-600 font-medium">
+                        {neighborhood.total_reviews} Review{neighborhood.total_reviews !== 1 ? 's' : ''}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Content */}
+          <div className="p-6 lg:p-8 xl:p-12">
+            {/* Compact Stats Bar */}
+            <div className="flex items-center gap-6 mb-6">
+              <div className="text-center">
+                <div className="flex items-center space-x-1 mb-1">
+                  <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
+                  <span className="text-2xl font-bold text-gray-900">
+                    {neighborhood.average_rating > 0 ? neighborhood.average_rating.toFixed(1) : 'N/A'}
+                  </span>
+                </div>
+                <div className="text-xs text-gray-600">{neighborhood.total_reviews || 0} reviews</div>
+              </div>
+              
+              <div className="h-10 w-px bg-gray-200"></div>
+              
+              <div className="text-center">
+                <div className="text-xl font-bold text-gray-900 mb-1">{allImages.length}</div>
+                <div className="text-xs text-gray-600">Photos</div>
+              </div>
+              
+              <div className="h-10 w-px bg-gray-200 hidden sm:block"></div>
+              
+              <div className="text-center hidden sm:block">
+                <div className="text-sm font-semibold text-gray-900 mb-1">
+                  {reviews.length > 0 ? new Date(Math.max(...reviews.map(r => new Date(r.created_at).getTime()))).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'N/A'}
+                </div>
+                <div className="text-xs text-gray-600">Latest</div>
               </div>
             </div>
 
+            {/* Prominent CTA Card - At the top */}
+            <div className="bg-gradient-to-r from-primary-500 to-primary-600 rounded-xl p-6 mb-8 shadow-lg">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="text-white text-center sm:text-left">
+                  <h3 className="text-xl font-bold mb-1">Have experience with this neighborhood?</h3>
+                  <p className="text-primary-100 text-sm">Share your rating and help others make informed decisions</p>
+                </div>
+                <Link
+                  href={`/rate/neighborhood?prefill=${encodeURIComponent(JSON.stringify({
+                    name: neighborhood.name,
+                    city: neighborhood.city,
+                    province: neighborhood.province,
+                    latitude: neighborhood.latitude,
+                    longitude: neighborhood.longitude
+                  }))}`}
+                  className="bg-white text-primary-600 px-8 py-3 rounded-lg hover:bg-gray-50 transition-all font-bold shadow-md flex items-center space-x-2 whitespace-nowrap"
+                >
+                  <Star className="w-5 h-5" />
+                  <span>Rate</span>
+                </Link>
+              </div>
+            </div>
+
+
             {/* Category Ratings - Show if reviews exist */}
             {reviews.length > 0 && (
-              <div className="mb-12">
-                {/* SEO-optimized H2 with categories */}
-                <h2 className="text-3xl font-bold text-gray-900 mb-2">
-                  Category Breakdown
-                </h2>
-                <p className="text-gray-600 mb-8">
+              <div className="mb-8">
+                <h2 className="text-xl font-bold text-gray-900 mb-1">Category Breakdown</h2>
+                <p className="text-sm text-gray-600 mb-4">
                   {neighborhood.name} Safety, Cleanliness, Noise, Transit & Community Ratings
                 </p>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                   {[
                     { id: 'safety', label: 'Safety', icon: Shield, avg: reviews.reduce((sum, r) => sum + r.safety, 0) / reviews.length, color: 'text-green-600' },
                     { id: 'cleanliness', label: 'Cleanliness', icon: Sparkles, avg: reviews.reduce((sum, r) => sum + r.cleanliness, 0) / reviews.length, color: 'text-blue-600' },
@@ -294,47 +336,44 @@ export default function NeighborhoodDetail() {
                     const Icon = category.icon
                     const percentage = (category.avg / 5) * 100
                     return (
-                      <div key={category.id} className="bg-gradient-to-br from-white to-gray-50 rounded-2xl p-6 border-2 border-gray-100 hover:border-primary-200 hover:shadow-lg transition-all">
-                        <div className="flex items-center space-x-3 mb-4">
-                          <div className={`w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br ${
-                            category.color === 'text-green-600' ? 'from-green-50 to-green-100' :
-                            category.color === 'text-blue-600' ? 'from-blue-50 to-blue-100' :
-                            category.color === 'text-purple-600' ? 'from-purple-50 to-purple-100' :
-                            category.color === 'text-pink-600' ? 'from-pink-50 to-pink-100' :
-                            category.color === 'text-indigo-600' ? 'from-indigo-50 to-indigo-100' :
-                            'from-orange-50 to-orange-100'
+                      <div key={category.id} className="group bg-gray-50 rounded-lg p-3 border border-gray-200 hover:border-primary-300 transition-all">
+                        <div className="flex flex-col items-center text-center">
+                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center bg-gradient-to-br mb-2 ${
+                            category.color === 'text-green-600' ? 'from-green-400 to-green-500' :
+                            category.color === 'text-blue-600' ? 'from-blue-400 to-blue-500' :
+                            category.color === 'text-purple-600' ? 'from-purple-400 to-purple-500' :
+                            category.color === 'text-pink-600' ? 'from-pink-400 to-pink-500' :
+                            category.color === 'text-indigo-600' ? 'from-indigo-400 to-indigo-500' :
+                            'from-orange-400 to-orange-500'
                           }`}>
-                            <Icon className={`w-6 h-6 ${category.color}`} />
+                            <Icon className="w-5 h-5 text-white" />
                           </div>
-                          <span className="font-bold text-gray-900 text-lg">{category.label}</span>
-                        </div>
-                        
-                        <div className="mb-3">
-                          <div className="flex items-baseline space-x-2 mb-2">
-                            <span className="text-4xl font-bold text-gray-900">
-                              {category.avg.toFixed(1)}
-                            </span>
-                            <span className="text-gray-500 text-sm">/ 5.0</span>
+                          <span className="font-semibold text-gray-900 text-xs mb-1">{category.label}</span>
+                          <div className="text-2xl font-bold text-gray-900 mb-1">
+                            {category.avg.toFixed(1)}
                           </div>
-                          <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
+                          <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden mb-1">
                             <div
-                              className={`h-full rounded-full transition-all duration-500 ${
+                              className={`h-full rounded-full transition-all ${
                                 percentage >= 80 ? 'bg-green-500' :
-                                percentage >= 60 ? 'bg-primary-500' :
+                                percentage >= 60 ? 'bg-blue-500' :
                                 percentage >= 40 ? 'bg-yellow-500' :
                                 'bg-red-500'
                               }`}
                               style={{ width: `${percentage}%` }}
                             />
                           </div>
-                        </div>
-                        
-                        {/* Rating Label */}
-                        <div className="text-sm font-medium">
-                          {percentage >= 80 && <span className="text-green-600">Excellent</span>}
-                          {percentage >= 60 && percentage < 80 && <span className="text-primary-600">Good</span>}
-                          {percentage >= 40 && percentage < 60 && <span className="text-yellow-600">Average</span>}
-                          {percentage < 40 && <span className="text-red-600">Needs Improvement</span>}
+                          <span className={`text-xs font-medium ${
+                            percentage >= 80 ? 'text-green-600' :
+                            percentage >= 60 ? 'text-blue-600' :
+                            percentage >= 40 ? 'text-yellow-600' :
+                            'text-red-600'
+                          }`}>
+                            {percentage >= 80 && 'Excellent'}
+                            {percentage >= 60 && percentage < 80 && 'Good'}
+                            {percentage >= 40 && percentage < 60 && 'Average'}
+                            {percentage < 40 && 'Poor'}
+                          </span>
                         </div>
                       </div>
                     )
@@ -344,14 +383,12 @@ export default function NeighborhoodDetail() {
             )}
 
             {/* All Images Gallery */}
-            {allImages.length > 0 && (
-              <div className="mb-12 bg-gradient-to-br from-gray-50 to-gray-100 rounded-3xl p-8 border border-gray-200">
-                <div className="flex items-center justify-between mb-6">
+            {allImages.length > 1 && (
+              <div className="mb-8 bg-gray-50 rounded-xl p-6 border border-gray-200">
+                <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h2 className="text-3xl font-bold text-gray-900 mb-2">
-                      Community Photos
-                    </h2>
-                    <p className="text-gray-600">{allImages.length} real {allImages.length === 1 ? 'photo' : 'photos'} from residents</p>
+                    <h2 className="text-lg font-bold text-gray-900">Community Photos</h2>
+                    <p className="text-sm text-gray-600">{allImages.length} photos from residents</p>
                   </div>
                   <button
                     onClick={() => {
@@ -403,35 +440,25 @@ export default function NeighborhoodDetail() {
             {/* All User Reviews */}
             {reviews.length > 0 && (
               <div className="mb-12">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-3">
                   <div>
-                    <div className="flex items-center space-x-3 mb-2">
-                      <MessageCircle className="w-7 h-7 text-primary-500" />
-                      <h2 className="text-3xl font-bold text-gray-900">
-                        Resident Reviews
-                      </h2>
-                    </div>
-                    <p className="text-gray-600">
-                      {ratingFilter ? reviews.filter(r => Math.round((r.safety + r.cleanliness + r.noise + r.community + r.transit + r.amenities) / 6) === ratingFilter).length : reviews.length} verified {reviews.length === 1 ? 'review' : 'reviews'} from real residents
-                    </p>
+                    <h2 className="text-xl font-bold text-gray-900 mb-1">Reviews ({reviews.length})</h2>
+                    <p className="text-sm text-gray-600">Sorted by most helpful • Real residents</p>
                   </div>
                   
                   {/* Rating Filter */}
-                  <div className="flex items-center space-x-2 bg-white border border-gray-200 rounded-xl px-4 py-2 shadow-sm">
-                    <span className="text-sm font-medium text-gray-700">Filter:</span>
-                    <select
-                      value={ratingFilter || ''}
-                      onChange={(e) => setRatingFilter(e.target.value ? parseInt(e.target.value) : null)}
-                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none text-sm font-medium bg-white"
-                    >
-                      <option value="">All Ratings</option>
-                      <option value="5">⭐ 5 Stars Only</option>
-                      <option value="4">⭐ 4 Stars Only</option>
-                      <option value="3">⭐ 3 Stars Only</option>
-                      <option value="2">⭐ 2 Stars Only</option>
-                      <option value="1">⭐ 1 Star Only</option>
-                    </select>
-                  </div>
+                  <select
+                    value={ratingFilter || ''}
+                    onChange={(e) => setRatingFilter(e.target.value ? parseInt(e.target.value) : null)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none text-sm font-medium bg-white shadow-sm"
+                  >
+                    <option value="">All Ratings</option>
+                    <option value="5">⭐ 5 Stars</option>
+                    <option value="4">⭐ 4 Stars</option>
+                    <option value="3">⭐ 3 Stars</option>
+                    <option value="2">⭐ 2 Stars</option>
+                    <option value="1">⭐ 1 Star</option>
+                  </select>
                 </div>
 
                 <div className="space-y-4">
@@ -441,27 +468,34 @@ export default function NeighborhoodDetail() {
                       const reviewAvg = Math.round((review.safety + review.cleanliness + review.noise + review.community + review.transit + review.amenities) / 6)
                       return reviewAvg === ratingFilter
                     })
+                    .sort((a, b) => {
+                      // Reddit-style algorithm: Sort by (upvotes - downvotes), then by date
+                      const aScore = (a.helpful_count || 0) - (a.not_helpful_count || 0)
+                      const bScore = (b.helpful_count || 0) - (b.not_helpful_count || 0)
+                      if (aScore !== bScore) return bScore - aScore
+                      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+                    })
                     .map((review, index) => {
                     const reviewAvg = (review.safety + review.cleanliness + review.noise + review.community + review.transit + review.amenities) / 6
                     const displayName = review.is_anonymous ? 'Anonymous User' : (review.display_name || 'Anonymous User')
                     
                     return (
-                      <div key={review.id} className="bg-white rounded-xl p-4 shadow-sm border border-gray-200 hover:border-primary-300 hover:shadow-md transition-all">
-                        <div className="flex items-start justify-between mb-3">
-                          <div className="flex items-center space-x-3">
-                            <div className={`w-10 h-10 bg-gradient-to-br ${review.is_anonymous ? 'from-gray-400 to-gray-500' : 'from-primary-500 to-primary-600'} rounded-lg flex items-center justify-center shadow-md`}>
-                              <User className="w-5 h-5 text-white" />
+                      <div key={review.id} className="bg-white rounded-lg p-4 border border-gray-200 hover:border-primary-200 hover:shadow-md transition-all">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center space-x-2">
+                            <div className={`w-8 h-8 bg-gradient-to-br ${review.is_anonymous ? 'from-gray-400 to-gray-500' : 'from-primary-500 to-primary-600'} rounded-lg flex items-center justify-center`}>
+                              <User className="w-4 h-4 text-white" />
                             </div>
                             <div>
-                              <p className="font-semibold text-gray-900">{displayName}</p>
+                              <p className="font-semibold text-gray-900 text-sm">{displayName}</p>
                               <p className="text-xs text-gray-500">
                                 {new Date(review.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                               </p>
                             </div>
                           </div>
-                          <div className="flex items-center space-x-1 bg-primary-50 px-3 py-1 rounded-full">
-                            <Star className="w-4 h-4 text-primary-500 fill-primary-500" />
-                            <span className="font-bold text-primary-600">{reviewAvg.toFixed(1)}</span>
+                          <div className="flex items-center space-x-1.5 bg-gradient-to-r from-primary-500 to-primary-600 px-3 py-1.5 rounded-lg shadow-sm">
+                            <Star className="w-4 h-4 text-white fill-white" />
+                            <span className="font-bold text-white">{reviewAvg.toFixed(1)}</span>
                           </div>
                         </div>
 
@@ -501,13 +535,23 @@ export default function NeighborhoodDetail() {
 
                         {/* Comment */}
                         {review.comment && (
-                          <div className="bg-gray-50 rounded-lg p-3 mt-3 border border-gray-200">
+                          <div className="bg-gray-50 rounded-lg p-4 mt-3 border border-gray-200">
                             <div className="flex items-start space-x-2">
                               <MessageCircle className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
                               <p className="text-gray-700 text-sm leading-relaxed">{review.comment}</p>
                             </div>
                           </div>
                         )}
+
+                        {/* Like/Dislike Voting */}
+                        <div className="mt-4 pt-4 border-t border-gray-100">
+                          <ReviewVoting
+                            reviewId={review.id}
+                            reviewType="neighborhood"
+                            helpfulCount={review.helpful_count || 0}
+                            notHelpfulCount={review.not_helpful_count || 0}
+                          />
+                        </div>
 
                         {/* Review Photos */}
                         {review.images && review.images.length > 0 && (
@@ -542,28 +586,6 @@ export default function NeighborhoodDetail() {
               </div>
             )}
 
-            {/* Call to Action */}
-            <div className="p-8 bg-gradient-to-br from-primary-50 to-orange-50 rounded-2xl text-center">
-              <h3 className="text-2xl font-bold text-gray-900 mb-3">
-                Have experience with this neighborhood?
-              </h3>
-              <p className="text-gray-600 mb-6">
-                Share your own rating and help others make informed decisions
-              </p>
-              <Link 
-                href={`/rate/neighborhood?prefill=${encodeURIComponent(JSON.stringify({
-                  name: neighborhood.name,
-                  city: neighborhood.city,
-                  province: neighborhood.province,
-                  latitude: neighborhood.latitude,
-                  longitude: neighborhood.longitude
-                }))}`}
-                className="btn-primary inline-flex items-center space-x-2"
-              >
-                <Star className="w-5 h-5" />
-                <span>Rate This Neighborhood</span>
-              </Link>
-            </div>
           </div>
         </div>
 

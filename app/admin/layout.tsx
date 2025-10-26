@@ -110,6 +110,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const menuItems = [
     { href: '/admin', icon: Shield, label: 'Dashboard', badge: null },
     { href: '/admin/pending', icon: Clock, label: 'Pending Reviews', badge: pendingCount > 0 ? pendingCount : null },
+    { href: '/admin/reviews', icon: CheckCircle, label: 'Review Management', badge: null },
+    { href: '/admin/all-reviews', icon: Star, label: 'All Reviews', badge: null },
     { href: '/admin/users', icon: Users, label: 'Users', badge: null },
     { href: '/admin/neighborhoods', icon: MapPin, label: 'Neighborhoods', badge: null },
     { href: '/admin/buildings', icon: Building2, label: 'Buildings', badge: null },
